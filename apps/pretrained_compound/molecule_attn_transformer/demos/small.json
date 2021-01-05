@@ -1,0 +1,14 @@
+{
+  "embed_dim": 32,
+  "hidden_size": 1024,
+  "head_num": 8,
+  "block_num": 6,
+  "ffn_layer_num": 1,
+  "pred_layer_num": 1,
+  "output_dim": 119,
+  "dropout_rate": 0.3,
+  "lambdas": [0.33, 0.33, 0.33],
+  "trainable_lambda": false,
+  "dist_matrix_kernel": "exp",
+  "aggregation_type": "dummy_node"
+}

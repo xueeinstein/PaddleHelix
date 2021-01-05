@@ -20,6 +20,7 @@
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from sklearn.metrics import pairwise_distances
 
 
 class CompoundConstants(object):
@@ -68,6 +69,51 @@ def atom_numeric_feat(n, allowable, to_one_hot=True):
         return feat
     else:
         return n
+
+
+def get_adj_dist_mat(mol, add_dummy_node=False):
+    """
+    Compute the adjacency and distance matrices for molecule graph.
+    """
+    # Make `mol.GetConformer` work
+    added_Hs = False
+    try:
+        mol = Chem.AddHs(mol)
+        added_Hs = True
+        AllChem.EmbedMolecule(mol, maxAttempts=5000)
+        AllChem.UFFOptimizeMolecule(mol)
+        mol = Chem.RemoveHs(mol)
+    except:
+        if added_Hs:
+            # `UFFOptimizeMolecule` may raise 'ValueError: Bad Conformer Id'
+            # after added Hs
+            mol = Chem.RemoveHs(mol)
+        AllChem.Compute2DCoords(mol)
+
+    adj_matrix = np.eye(mol.GetNumAtoms())
+    for bond in mol.GetBonds():
+        i = bond.GetBeginAtomIdx()
+        j = bond.GetEndAtomIdx()
+        adj_matrix[i, j] = adj_matrix[j, i] = 1
+
+    conf = mol.GetConformer()
+    pos_matrix = np.array([[conf.GetAtomPosition(k).x,
+                            conf.GetAtomPosition(k).y,
+                            conf.GetAtomPosition(k).z]
+                           for k in range(mol.GetNumAtoms())])
+    dist_matrix = pairwise_distances(pos_matrix)
+
+    if add_dummy_node:
+        m = np.zeros((adj_matrix.shape[0] + 1, adj_matrix.shape[1] + 1))
+        m[1:, 1:] = adj_matrix
+        adj_matrix = m
+
+        m = np.full((dist_matrix.shape[0] + 1, dist_matrix.shape[1] + 1),
+                    1e6)  # treat 1e6 as infinity
+        m[1:, 1:] = dist_matrix
+        dist_matrix = m
+
+    return adj_matrix, dist_matrix
 
 
 def mol_to_graph_data(mol, add_self_loop=True):
@@ -174,14 +220,29 @@ def mol_to_graph_data(mol, add_self_loop=True):
     return data
 
 
-def smiles_to_graph_data(smiles, add_self_loop=True):
+def smiles_to_graph_data(smiles, add_self_loop=True, get_adj_dist=False,
+                         add_dummy_node=False):
     """
     Convert smiles to graph data.
+
+    Args:
+        add_self_loop (bool): whether to add self-loop when construct the molecule graph.
+        get_adj_dist (bool): whether to compute the adjacency matrix and distance matrix of the molecule graph.
+        add_dummy_node (bool): whether to add a dummy node in the adjacency matrix and distance matrix at the position (0, 0).
+
+    Returns:
+        data (dict)
     """
     mol = AllChem.MolFromSmiles(smiles)
     if mol is None:
         return None
     data = mol_to_graph_data(mol, add_self_loop)
+
+    if get_adj_dist:
+        adj_matrix, dist_matrix = get_adj_dist_mat(
+            mol, add_dummy_node=add_dummy_node)
+        data['adj_matrix'] = adj_matrix.copy()
+        data['dist_matrix'] = dist_matrix.copy()
     return data
 
 
