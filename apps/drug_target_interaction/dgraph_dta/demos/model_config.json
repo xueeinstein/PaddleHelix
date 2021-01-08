@@ -1,0 +1,8 @@
+{
+  "compound_embed_dim": 32,
+  "compound_hidden_size": 78,
+  "protein_hidden_size": 54,
+  "dropout_rate": 0.2,
+  "output_dim": 128,
+  "layer_num": 3
+}
