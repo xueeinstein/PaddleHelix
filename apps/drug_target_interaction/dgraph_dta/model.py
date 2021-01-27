@@ -29,7 +29,7 @@ class DoubleGCN(object):
         of compound and protein using GNN models.
     """
 
-    def __init__(self, model_config, name=''):
+    def __init__(self, model_config, without_msa=False, name=''):
         self.name = name
 
         self.compound_embed_dim = model_config['compound_embed_dim']
@@ -56,7 +56,8 @@ class DoubleGCN(object):
             ])
 
         # PSSM + amino acid type + amino acid properties
-        dim = len(ProteinConstants.amino_acids) * 2 + \
+        factor = 1 if without_msa else 2
+        dim = len(ProteinConstants.amino_acids) * factor + \
             ProteinConstants.amino_acids_properties_dim
         self.protein_graph_wrapper = GraphWrapper(
             name='protein_graph',

@@ -80,28 +80,9 @@ def amino_acid_to_feat(amino_acid):
     return np.array(feat_1 + feat_2)
 
 
-def protein_seq_to_feat(protein_key, protein_seq, msa_dir, pseudo_count=0.8):
+def protein_seq_to_feat(protein_key, protein_seq, msa_dir, pseudo_count=0.8,
+                        without_msa=False):
     """Create protein sequence embedding using MSA and amino acid type."""
-    aln_file = os.path.join(msa_dir, protein_key + '.aln')
-
-    # Compute Position-Specific Scoring Matrix (PSSM)
-    pfm_mat = np.zeros((len(ProteinConstants.amino_acids), len(protein_seq)))
-    with open(aln_file, 'r') as f:
-        line_count = len(f.readlines())
-        for line in f.readlines():
-            if len(line) != len(pro_seq):
-                print('error', len(line), len(pro_seq))
-                continue
-            count = 0
-            for res in line:
-                if res not in pro_res_table:
-                    count += 1
-                    continue
-                pfm_mat[pro_res_table.index(res), count] += 1
-                count += 1
-
-    pssm = (pfm_mat + pseudo_count / 4) / (float(line_count) + pseudo_count)
-
     # Compute other features from amino acid types and properties
     types = np.zeros((len(protein_seq), len(ProteinConstants.amino_acids)))
     properties = np.zeros((len(protein_seq), ProteinConstants.amino_acids_properties_dim))
@@ -110,12 +91,35 @@ def protein_seq_to_feat(protein_key, protein_seq, msa_dir, pseudo_count=0.8):
             protein_seq[i], ProteinConstants.amino_acids)
         properties[i, :] = amino_acid_to_feat(protein_seq[i])
 
-    joint_feat = np.concatenate(
-        [np.transpose(pssm, (1, 0)), types, properties], axis=1)
+    if without_msa:
+        joint_feat = np.concatenate([types, properties], axis=1)
+    else:
+        # Compute Position-Specific Scoring Matrix (PSSM)
+        pfm_mat = np.zeros((len(ProteinConstants.amino_acids), len(protein_seq)))
+        aln_file = os.path.join(msa_dir, protein_key + '.aln')
+        with open(aln_file, 'r') as f:
+            line_count = len(f.readlines())
+            for line in f.readlines():
+                if len(line) != len(pro_seq):
+                    print('error', len(line), len(pro_seq))
+                    continue
+                count = 0
+                for res in line:
+                    if res not in pro_res_table:
+                        count += 1
+                        continue
+                    pfm_mat[pro_res_table.index(res), count] += 1
+                    count += 1
+
+        pssm = (pfm_mat + pseudo_count / 4) / (float(line_count) + pseudo_count)
+        joint_feat = np.concatenate(
+            [np.transpose(pssm, (1, 0)), types, properties], axis=1)
+
     return joint_feat
 
 
-def protein_to_graph(protein_key, protein_seq, contact_map_dir, msa_dir, th=0.5):
+def protein_to_graph(protein_key, protein_seq, contact_map_dir, msa_dir,
+                     th=0.5, without_msa=False):
     """Convert target protein to graph using contact map and MSA."""
     contact_map = np.load(os.path.join(contact_map_dir, protein_key + '.npy'))
     contact_map += np.matrix(np.eye(contact_map.shape[0]))  # add self-loop
@@ -126,7 +130,8 @@ def protein_to_graph(protein_key, protein_seq, contact_map_dir, msa_dir, th=0.5)
         edges.append([i, j])
 
     # Node feature
-    seq_feat = protein_seq_to_feat(protein_key, protein_seq, msa_dir)
+    seq_feat = protein_seq_to_feat(protein_key, protein_seq, msa_dir,
+                                   without_msa=without_msa)
 
     data = {
         'protein_edges': np.array(edges),
@@ -141,7 +146,7 @@ def main():
     # for dataset in ['davis', 'kiba']:
     for dataset in ['kiba']:
         data_dir = os.path.join(args.dataset_root, dataset)
-        contact_map_dir = os.path.join(data_dir, 'pconsc4')
+        contact_map_dir = os.path.join(data_dir, args.cmap_dir)
         msa_dir = os.path.join(data_dir, 'aln')
 
         all_found = sum([os.path.exists(d) for d in
@@ -207,7 +212,8 @@ def main():
 
                 prot_graph = protein_to_graph(protein_keys[cols[idx]],
                                               protein_lst[cols[idx]],
-                                              contact_map_dir, msa_dir)
+                                              contact_map_dir, msa_dir,
+                                              without_msa=args.without_msa)
                 for k, v in prot_graph.items():
                     data[k] = v
 
@@ -245,5 +251,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=str, default=None, required=True)
     parser.add_argument('--npz_files', type=int, default=1)  # set it > 1 for multi trainers
+    # it's optional to use ground truth contact map
+    parser.add_argument('--cmap_dir', type=str, default='pconsc4')
+    parser.add_argument('--without_msa', default=False, action='store_true')
     args = parser.parse_args()
     main()

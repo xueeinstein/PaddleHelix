@@ -164,7 +164,8 @@ def main(args):
     train_startup = fluid.Program()
     with fluid.program_guard(train_program, train_startup):
         with fluid.unique_name.guard():
-            model = DoubleGCN(model_config=model_config, name='dta')
+            model = DoubleGCN(model_config=model_config,
+                              without_msa=args.without_msa, name='dta')
             model.train()
             test_program = train_program.clone(for_test=True)
             optimizer = fluid.optimizer.Adam(learning_rate=args.lr)
@@ -216,6 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('--distributed', dest='is_distributed', action='store_true')
     parser.add_argument('--use_kiba_label', action='store_true', default=False)
     parser.add_argument('--use_val', action='store_true', default=False)
+    parser.add_argument('--without_msa', action='store_true', default=False)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--num_workers", type=int, default=8)
     parser.add_argument("--max_epoch", type=int, default=1000)
