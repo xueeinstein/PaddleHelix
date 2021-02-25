@@ -165,7 +165,7 @@ def main():
             open(os.path.join(data_dir, 'ligands_can.txt')),
             object_pairs_hook=OrderedDict)
         proteins = json.load(
-            open(os.path.join(data_dir, 'proteins.txt')),
+            open(os.path.join(data_dir, args.protein_json)),
             object_pairs_hook=OrderedDict)
         # Use encoding 'latin1' to load py2 pkl from py3
         # pylint: disable=E1123
@@ -250,6 +250,7 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=str, default=None, required=True)
+    parser.add_argument('--protein_json', type=str, default='proteins.txt')
     parser.add_argument('--npz_files', type=int, default=1)  # set it > 1 for multi trainers
     # it's optional to use ground truth contact map
     parser.add_argument('--cmap_dir', type=str, default='pconsc4')
